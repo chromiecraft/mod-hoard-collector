@@ -11,3 +11,8 @@ INSERT INTO `creature_template` (`entry`, `name`, `subname`, `IconName`, `gossip
 DELETE FROM `creature_template_model` WHERE `CreatureID` = @Entry;
 INSERT INTO `creature_template_model` (`CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`, `VerifiedBuild`) VALUES
 (@Entry, 0, @Model, @Scale, 1, 0);
+
+DELETE FROM `npc_text` WHERE `ID` IN (70000, 70001);
+INSERT INTO `npc_text` (`ID`, `text0_0`) VALUES
+(70000, 'Ah, greetings, traveler. I am Hoard the Collector — seer of the stars, warden of what must not be lost. Place your treasures in my care, be they cursed, blessed, or simply beloved. I forget nothing... and what I guard is guarded forever.'),
+(70001, 'There are no items left in the storage.');

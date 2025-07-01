@@ -38,7 +38,7 @@ public:
 
         player->PlayerTalkClass->GetGossipMenu().AddMenuItem(0, 0, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
         player->PlayerTalkClass->GetGossipMenu().AddMenuItem(1, 0, "View stored items.", 0, HOARDER_ACTION_VIEW_STORED_ITEMS, "", 0);
-        player->PlayerTalkClass->SendGossipMenu(1, creature->GetGUID());
+        player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
         return true;
     }
 
@@ -78,7 +78,7 @@ public:
             }
         }
 
-        player->PlayerTalkClass->SendGossipMenu(1, creature->GetGUID());
+        player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
         return true;
     }
 
@@ -123,7 +123,7 @@ public:
         if (!itemCount)
         {
             player->SendSystemMessage("You have no items stored with the collector.");
-            player->PlayerTalkClass->SendGossipMenu(1, creature->GetGUID());
+            player->PlayerTalkClass->SendGossipMenu(70001, creature->GetGUID());
             return;
         }
 
