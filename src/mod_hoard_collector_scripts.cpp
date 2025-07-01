@@ -69,9 +69,9 @@ public:
                 if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                     if (item->GetEntry() == action)
                     {
-                        player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
                         CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, ItemEntry) VALUES ({}, {})", player->GetGUID().GetCounter(), item->GetEntry());
                         sCollector->AddItemToCollection(player->GetGUID(), item->GetEntry());
+                        player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
                         CloseGossipMenuFor(player);
                         return true;
                     }
@@ -120,6 +120,13 @@ public:
 
         uint32 itemCount = itemList.size();
 
+        if (!itemCount)
+        {
+            player->SendSystemMessage("You have no items stored with the collector.");
+            player->PlayerTalkClass->SendGossipMenu(1, creature->GetGUID());
+            return;
+        }
+
         WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + itemCount * 8 * 4);
         data << uint64(creature->GetGUID().GetRawValue());
 
@@ -138,7 +145,59 @@ public:
     }
 };
 
+class mod_hoard_collector_playerscript : public PlayerScript
+{
+public:
+    mod_hoard_collector_playerscript() : PlayerScript("mod_hoard_collector_playerscipt", {
+        PLAYERHOOK_ON_LOGOUT,
+        PLAYERHOOK_ON_BEFORE_BUY_ITEM_FROM_VENDOR
+        }) {
+    }
+
+    void OnPlayerLogout(Player* player) override
+    {
+        sCollector->ClearCollection(player->GetGUID());
+    }
+
+    void OnPlayerBeforeBuyItemFromVendor(Player* player, ObjectGuid vendorguid, uint32 /*vendorslot*/, uint32& itemEntry, uint8 /*count*/, uint8 /*bag*/, uint8 /*slot*/) override
+    {
+        Creature* vendor = player->GetMap()->GetCreature(vendorguid);
+        if (!vendor)
+            return;
+
+        if (sCollector->GetHoarderNpcId() != vendor->GetEntry())
+            return;
+
+        if (sCollector->HasItemInCollection(player->GetGUID(), itemEntry))
+        {
+            player->AddItem(itemEntry, 1); // Add the item to the player's inventory
+            sCollector->RemoveItemFromCollection(player->GetGUID(), itemEntry); // Remove the item from the collector's collection
+            CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", player->GetGUID().GetCounter(), itemEntry);
+        }
+
+        npc_hoard_the_collector::ShowItemsInFakeVendor(player, vendor); //Refresh menu
+        itemEntry = 0; //Prevents the handler from proceeding to core vendor handling
+    }
+};
+
+class mod_hoard_collector_worldscript : public WorldScript
+{
+public:
+    mod_hoard_collector_worldscript() : WorldScript("mod_hoard_collector_worldscript", {
+        WORLDHOOK_ON_AFTER_CONFIG_LOAD,
+        }) {
+    }
+
+    void OnAfterConfigLoad(bool reload) override
+    {
+        sCollector->SetEnabled(sConfigMgr->GetOption<bool>("ModHoardCollector.Enable", false));
+        sCollector->SetHoarderNpcId(sConfigMgr->GetOption<uint32>("ModHoardCollector.NpcID", 70000));
+    }
+};
+
 void AddModHoardCollectorScripts()
 {
     new npc_hoard_the_collector();
+    new mod_hoard_collector_playerscript();
+    new mod_hoard_collector_worldscript();
 };

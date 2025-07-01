@@ -14,6 +14,8 @@ class HoardCollector
 {
 private:
     std::unordered_map<ObjectGuid, std::vector<uint32>> HoarderCollectedItems;
+    uint32 HoarderNpcId;
+    bool Enabled;
 
 public:
     static HoardCollector* instance();
@@ -48,7 +50,12 @@ public:
         HoarderCollectedItems.erase(playerGuid);
     }
 
+    void SetHoarderNpcId(uint32 npcId) { HoarderNpcId = npcId; }
+    void SetEnabled(bool enabled) { Enabled = enabled; }
+    [[nodiscard]] bool IsEnabled() const { return Enabled; }
     [[nodiscard]] bool IsCollectionEmpty(ObjectGuid playerGuid) { return HoarderCollectedItems[playerGuid].empty(); }
+
+    [[nodiscard]] uint32 GetHoarderNpcId() const { return HoarderNpcId; }
 };
 
 #define sCollector HoardCollector::instance()
