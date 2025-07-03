@@ -56,6 +56,7 @@ public:
     [[nodiscard]] bool IsCollectionEmpty(ObjectGuid playerGuid) { return HoarderCollectedItems[playerGuid].empty(); }
 
     [[nodiscard]] uint32 GetHoarderNpcId() const { return HoarderNpcId; }
+    [[nodiscard]] bool IsItemValid(Item* item) const;
 };
 
 #define sCollector HoardCollector::instance()

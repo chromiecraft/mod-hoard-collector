@@ -54,7 +54,8 @@ public:
             {
                 if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                     if (ItemTemplate const* itemTemplate = item->GetTemplate())
-                        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, GetItemIcon(item->GetEntry(), 30, 30, -18, 0) + itemTemplate->Name1, 0, item->GetEntry(), "", 0);
+                        if (sCollector->IsItemValid(item))
+                            player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, GetItemIcon(item->GetEntry(), 30, 30, -18, 0) + itemTemplate->Name1, 0, item->GetEntry(), "", 0);
             }
         }
         else if (action == HOARDER_ACTION_VIEW_STORED_ITEMS)
@@ -69,6 +70,13 @@ public:
                 if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
                     if (item->GetEntry() == action)
                     {
+                        if (!sCollector->IsItemValid(item))
+                        {
+                            player->SendSystemMessage("This item cannot be stored with the collector.");
+                            CloseGossipMenuFor(player);
+                            return true;
+                        }
+
                         CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, ItemEntry) VALUES ({}, {})", player->GetGUID().GetCounter(), item->GetEntry());
                         sCollector->AddItemToCollection(player->GetGUID(), item->GetEntry());
                         player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);

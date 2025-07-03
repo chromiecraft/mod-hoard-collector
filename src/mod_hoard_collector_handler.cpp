@@ -24,3 +24,25 @@ void HoardCollector::LoadCollectionItems(uint32 guid)
         AddItemToCollection(playerGuid, itemId);
     } while (result->NextRow());
 }
+
+bool HoardCollector::IsItemValid(Item* item) const
+{
+    // Check if the item is valid for collection
+    if (!item || !item->GetTemplate())
+        return false;
+
+    if (item->GetUInt32Value(ITEM_FIELD_DURATION))
+        return false;
+
+    if (item->IsNotEmptyBag())
+        return false;
+
+    if (item->GetCount() > 1)
+        return false;
+
+    // Check if the item is already in the collection
+    if (HasItemInCollection(item->GetOwnerGUID(), item->GetEntry()))
+        return false;
+
+    return true;
+}
