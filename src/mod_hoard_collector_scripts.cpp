@@ -12,8 +12,10 @@
 
 enum HoarderActions
 {
-    HOARDER_ACTION_BACKPACK_ITEMS    = 1,
-    HOARDER_ACTION_VIEW_STORED_ITEMS = 2
+    HOARDER_ACTION_STORAGE_1         = 0,
+    HOARDER_ACTION_STORAGE_2         = 1,
+    HOARDER_ACTION_STORAGE_3         = 2,
+    HOARDER_ACTION_BACKPACK_ITEMS    = 3,
 };
 
 class npc_hoard_the_collector : public CreatureScript
@@ -36,8 +38,18 @@ public:
         if (sCollector->IsCollectionEmpty(player->GetGUID()))
             sCollector->LoadCollectionItems(player->GetGUID().GetCounter());
 
-        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(0, 0, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
-        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(1, 0, "View stored items.", 0, HOARDER_ACTION_VIEW_STORED_ITEMS, "", 0);
+        sCollector->ClearStorageSelection(player->GetGUID());
+
+        uint8 menuIndex = 0;
+
+        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuIndex, GOSSIP_ICON_VENDOR, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
+
+        for (uint8 index = 0; index < MAX_HOARDER_STORAGES; ++index)
+        {
+            if (player->GetPlayerSetting(ModName, index).IsEnabled() || player->IsGameMaster())
+                player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_MONEY_BAG, "View items stored in storage " + std::to_string(index + 1) + ".", 0, HOARDER_ACTION_STORAGE_1 + index, "", 0);
+        }
+
         player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
         return true;
     }
@@ -48,42 +60,46 @@ public:
 
         uint32 menuItem = 0;
 
-        if (action == HOARDER_ACTION_BACKPACK_ITEMS)
+        switch (action)
         {
-            for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
-            {
-                if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                    if (ItemTemplate const* itemTemplate = item->GetTemplate())
-                        if (sCollector->IsItemValid(item))
-                            player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, GetItemIcon(item->GetEntry(), 30, 30, -18, 0) + itemTemplate->Name1, 0, item->GetEntry(), "", 0);
-            }
-        }
-        else if (action == HOARDER_ACTION_VIEW_STORED_ITEMS)
-        {
-            ShowItemsInFakeVendor(player, creature);
-            return true;
-        }
-        else
-        {
-            for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
-            {
-                if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                    if (item->GetEntry() == action)
-                    {
-                        if (!sCollector->IsItemValid(item))
+            case HOARDER_ACTION_STORAGE_1:
+            case HOARDER_ACTION_STORAGE_2:
+            case HOARDER_ACTION_STORAGE_3:
+                sCollector->SetStorageSelection(player->GetGUID(), action);
+                ShowItemsInFakeVendor(player, creature, action);
+                return true;
+            case HOARDER_ACTION_BACKPACK_ITEMS:
+                for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+                {
+                    if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                        if (ItemTemplate const* itemTemplate = item->GetTemplate())
+                            if (sCollector->IsItemValid(item))
+                                player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, GetItemIcon(item->GetEntry(), 30, 30, -18, 0) + itemTemplate->Name1, 0, item->GetEntry(), "", 0);
+                }
+                break;
+            default:
+                // In this case, the action is an item entry
+                // Process the action of storing an item
+                for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+                {
+                    if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                        if (item->GetEntry() == action)
                         {
-                            player->SendSystemMessage("This item cannot be stored with the collector.");
+                            if (!sCollector->IsItemValid(item))
+                            {
+                                player->SendSystemMessage("This item cannot be stored with the collector.");
+                                CloseGossipMenuFor(player);
+                                return true;
+                            }
+
+                            CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, ItemEntry) VALUES ({}, {})", player->GetGUID().GetCounter(), item->GetEntry());
+                            sCollector->AddItemToCollection(player->GetGUID(), STORAGE_ONE, item->GetEntry());
+                            player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
                             CloseGossipMenuFor(player);
                             return true;
                         }
-
-                        CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, ItemEntry) VALUES ({}, {})", player->GetGUID().GetCounter(), item->GetEntry());
-                        sCollector->AddItemToCollection(player->GetGUID(), item->GetEntry());
-                        player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
-                        CloseGossipMenuFor(player);
-                        return true;
-                    }
-            }
+                }
+                break;
         }
 
         player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
@@ -122,15 +138,15 @@ public:
         slot++;
     }
 
-    static void ShowItemsInFakeVendor(Player* player, Creature* creature)
+    static void ShowItemsInFakeVendor(Player* player, Creature* creature, uint8 storage)
     {
-        std::vector<uint32> itemList = sCollector->GetCollectedItems()[player->GetGUID()];
+        std::vector<uint32> itemList = sCollector->GetCollectedItems()[player->GetGUID()][storage];
 
         uint32 itemCount = itemList.size();
 
         if (!itemCount)
         {
-            player->SendSystemMessage("You have no items stored with the collector.");
+            player->SendSystemMessage("You have no items stored in this storage.");
             player->PlayerTalkClass->SendGossipMenu(70001, creature->GetGUID());
             return;
         }
@@ -165,6 +181,7 @@ public:
     void OnPlayerLogout(Player* player) override
     {
         sCollector->ClearCollection(player->GetGUID());
+        sCollector->ClearStorageSelection(player->GetGUID());
     }
 
     void OnPlayerBeforeBuyItemFromVendor(Player* player, ObjectGuid vendorguid, uint32 /*vendorslot*/, uint32& itemEntry, uint8 /*count*/, uint8 /*bag*/, uint8 /*slot*/) override
@@ -176,14 +193,16 @@ public:
         if (sCollector->GetHoarderNpcId() != vendor->GetEntry())
             return;
 
-        if (sCollector->HasItemInCollection(player->GetGUID(), itemEntry))
+        uint8 storageId = sCollector->GetStorageSelection(player->GetGUID());
+
+        if (sCollector->HasItemInCollection(player->GetGUID(), storageId, itemEntry))
         {
             player->AddItem(itemEntry, 1); // Add the item to the player's inventory
-            sCollector->RemoveItemFromCollection(player->GetGUID(), itemEntry); // Remove the item from the collector's collection
+            sCollector->RemoveItemFromCollection(player->GetGUID(), storageId, itemEntry); // Remove the item from the collector's collection
             CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", player->GetGUID().GetCounter(), itemEntry);
         }
 
-        npc_hoard_the_collector::ShowItemsInFakeVendor(player, vendor); //Refresh menu
+        npc_hoard_the_collector::ShowItemsInFakeVendor(player, vendor, storageId); //Refresh menu
         itemEntry = 0; //Prevents the handler from proceeding to core vendor handling
     }
 };
