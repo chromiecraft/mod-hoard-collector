@@ -46,8 +46,12 @@ public:
         uint8 menuIndex = 0;
 
         player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuIndex, GOSSIP_ICON_CHAT, "Tell me, how does this work?", 0, HOARDER_ACTION_HELP, "", 0);
-        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_VENDOR, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
-        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_INTERACT_1, "Search for items.", GOSSIP_SENDER_MAIN, HOARDER_ACTION_SEARCH_ITEMS, "", 0, true);
+
+        if (player->GetPlayerSetting(ModName, STORAGE_ONE).IsEnabled() || player->IsGameMaster())
+        {
+            player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_VENDOR, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
+            player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_INTERACT_1, "Search for items.", GOSSIP_SENDER_MAIN, HOARDER_ACTION_SEARCH_ITEMS, "", 0, true);
+        }
 
         for (uint8 index = 0; index < MAX_HOARDER_STORAGES; ++index)
         {
