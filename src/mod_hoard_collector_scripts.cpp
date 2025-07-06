@@ -15,7 +15,9 @@ enum HoarderActions
     HOARDER_ACTION_STORAGE_1         = 0,
     HOARDER_ACTION_STORAGE_2         = 1,
     HOARDER_ACTION_STORAGE_3         = 2,
-    HOARDER_ACTION_BACKPACK_ITEMS    = 3
+    HOARDER_ACTION_BACKPACK_ITEMS    = 3,
+    HOARDER_ACTION_SEARCH_ITEMS      = 4,
+    HOARDER_ACTION_HELP              = 5,
 };
 
 class npc_hoard_the_collector : public CreatureScript
@@ -39,10 +41,13 @@ public:
             sCollector->LoadCollectionItems(player->GetGUID().GetCounter());
 
         sCollector->ClearStorageSelection(player->GetGUID());
+        sCollector->GetCollectedItems()[player->GetGUID()][STORAGE_SEARCH].clear();
 
         uint8 menuIndex = 0;
 
-        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuIndex, GOSSIP_ICON_VENDOR, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
+        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuIndex, GOSSIP_ICON_CHAT, "Tell me, how does this work?", 0, HOARDER_ACTION_HELP, "", 0);
+        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_VENDOR, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
+        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_INTERACT_1, "Search for items.", GOSSIP_SENDER_MAIN, HOARDER_ACTION_SEARCH_ITEMS, "", 0, true);
 
         for (uint8 index = 0; index < MAX_HOARDER_STORAGES; ++index)
         {
@@ -103,6 +108,9 @@ public:
                 sCollector->SetStorageSelection(player->GetGUID(), HOARDER_ACTION_BACKPACK_ITEMS);
                 break;
             }
+            case HOARDER_ACTION_HELP:
+                player->PlayerTalkClass->SendGossipMenu(70004, creature->GetGUID());
+                return true;
             default:
                 // In this case, the action is an item entry
                 // Process the action of storing an item
@@ -121,6 +129,9 @@ public:
                             CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, ItemEntry) VALUES ({}, {})", player->GetGUID().GetCounter(), item->GetEntry());
                             sCollector->AddItemToCollection(player->GetGUID(), sCollector->GetStorageSelection(player->GetGUID()), item->GetEntry());
                             player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
+                            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+                            player->SaveInventoryAndGoldToDB(trans);
+                            CharacterDatabase.CommitTransaction(trans);
                             CloseGossipMenuFor(player);
                             return true;
                         }
@@ -129,6 +140,65 @@ public:
         }
 
         player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
+        return true;
+    }
+
+    bool OnGossipSelectCode(Player* player, Creature* creature, uint32 sender, uint32 action, const char* code) override
+    {
+        player->PlayerTalkClass->ClearMenus();
+
+        if (sender != GOSSIP_SENDER_MAIN)
+            return true;
+
+        std::string searchInput(code);
+        std::string normalizedInput = searchInput;
+
+        bool capitalizeNext = true;
+        for (char& c : normalizedInput)
+        {
+            if (std::isspace(static_cast<unsigned char>(c)))
+                capitalizeNext = true;
+            else if (capitalizeNext)
+            {
+                c = std::toupper(static_cast<unsigned char>(c));
+                capitalizeNext = false;
+            }
+        }
+
+        std::vector<uint32> allItems;
+
+        if (auto it = sCollector->GetCollectedItems().find(player->GetGUID()); it != sCollector->GetCollectedItems().end())
+            for (const auto& [_, items] : it->second)
+                for (uint32 itemId : items)
+                    allItems.emplace_back(itemId);
+
+        uint32 matchedCount = 0;
+        std::vector<uint32> foundItems;
+
+        for (const auto& item : allItems)
+        {
+            if (matchedCount >= MAX_VENDOR_ITEMS)
+                break;
+
+            if (ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(item))
+            {
+                std::string name = itemTemplate->Name1;
+                if (name.find(searchInput) != std::string::npos || name.find(normalizedInput) != std::string::npos)
+                {
+                    sCollector->AddItemToCollection(player->GetGUID(), STORAGE_SEARCH, item);
+                    ++matchedCount;
+                }
+            }
+        }
+
+        if (!matchedCount)
+            player->PlayerTalkClass->SendGossipMenu(70003, creature->GetGUID());
+        else
+        {
+            sCollector->SetStorageSelection(player->GetGUID(), STORAGE_SEARCH);
+            npc_hoard_the_collector::ShowItemsInFakeVendor(player, creature, STORAGE_SEARCH);
+        }
+
         return true;
     }
 
@@ -220,11 +290,28 @@ public:
 
         uint8 storageId = sCollector->GetStorageSelection(player->GetGUID());
 
-        if (sCollector->HasItemInCollection(player->GetGUID(), storageId, itemEntry))
+        if (storageId == STORAGE_SEARCH && sCollector->HasItemInAnyCollection(player->GetGUID(), itemEntry))
+        {
+            player->AddItem(itemEntry, 1); // Add the item to the player's inventory
+
+            for (uint8 storage = 0; storage < MAX_HOARDER_STORAGES; ++storage)
+                sCollector->RemoveItemFromCollection(player->GetGUID(), storage, itemEntry); // Remove the item from the collector's collection
+
+            sCollector->RemoveItemFromCollection(player->GetGUID(), storageId, itemEntry);
+            CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", player->GetGUID().GetCounter(), itemEntry);
+
+            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+            player->SaveInventoryAndGoldToDB(trans);
+            CharacterDatabase.CommitTransaction(trans);
+        } else if (sCollector->HasItemInCollection(player->GetGUID(), storageId, itemEntry))
         {
             player->AddItem(itemEntry, 1); // Add the item to the player's inventory
             sCollector->RemoveItemFromCollection(player->GetGUID(), storageId, itemEntry); // Remove the item from the collector's collection
             CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", player->GetGUID().GetCounter(), itemEntry);
+
+            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+            player->SaveInventoryAndGoldToDB(trans);
+            CharacterDatabase.CommitTransaction(trans);
         }
 
         npc_hoard_the_collector::ShowItemsInFakeVendor(player, vendor, storageId); //Refresh menu

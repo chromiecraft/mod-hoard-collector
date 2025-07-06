@@ -12,7 +12,9 @@ enum HoarderStorages
     STORAGE_ONE,
     STORAGE_TWO,
     STORAGE_THREE,
-    MAX_HOARDER_STORAGES
+    MAX_HOARDER_STORAGES,
+
+    STORAGE_SEARCH // temporary
 };
 
 const std::string ModName = "mhc";
