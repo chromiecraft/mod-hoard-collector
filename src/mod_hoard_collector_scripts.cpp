@@ -15,7 +15,7 @@ enum HoarderActions
     HOARDER_ACTION_STORAGE_1         = 0,
     HOARDER_ACTION_STORAGE_2         = 1,
     HOARDER_ACTION_STORAGE_3         = 2,
-    HOARDER_ACTION_BACKPACK_ITEMS    = 3,
+    HOARDER_ACTION_BACKPACK_ITEMS    = 3
 };
 
 class npc_hoard_the_collector : public CreatureScript
@@ -65,18 +65,44 @@ public:
             case HOARDER_ACTION_STORAGE_1:
             case HOARDER_ACTION_STORAGE_2:
             case HOARDER_ACTION_STORAGE_3:
-                sCollector->SetStorageSelection(player->GetGUID(), action);
-                ShowItemsInFakeVendor(player, creature, action);
+                if (sCollector->GetStorageSelection(player->GetGUID()) != HOARDER_ACTION_BACKPACK_ITEMS)
+                {
+                    // Player is not selecting a storage to store an item, display vendor interface.
+                    sCollector->SetStorageSelection(player->GetGUID(), action);
+                    ShowItemsInFakeVendor(player, creature, action);
+                }
+                else
+                {
+                    // Player is selecting a storage to store items.
+                    // Update the current storage selected and display items.
+                    sCollector->SetStorageSelection(player->GetGUID(), action);
+
+                    for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+                    {
+                        if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
+                            if (ItemTemplate const* itemTemplate = item->GetTemplate())
+                                if (sCollector->IsItemValid(item))
+                                    player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, GetItemIcon(item->GetEntry(), 30, 30, -18, 0) + itemTemplate->Name1, 0, item->GetEntry(), "", 0);
+                    }
+
+                    if (!menuItem)
+                        player->PlayerTalkClass->SendGossipMenu(70002, creature->GetGUID());
+                    else
+                        player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
+                }
                 return true;
             case HOARDER_ACTION_BACKPACK_ITEMS:
-                for (uint8 i = INVENTORY_SLOT_ITEM_START; i < INVENTORY_SLOT_ITEM_END; ++i)
+            {
+                uint8 menuIndex = 0;
+                for (uint8 index = 0; index < MAX_HOARDER_STORAGES; ++index)
                 {
-                    if (Item* item = player->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
-                        if (ItemTemplate const* itemTemplate = item->GetTemplate())
-                            if (sCollector->IsItemValid(item))
-                                player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, GetItemIcon(item->GetEntry(), 30, 30, -18, 0) + itemTemplate->Name1, 0, item->GetEntry(), "", 0);
+                    if (player->GetPlayerSetting(ModName, index).IsEnabled() || player->IsGameMaster())
+                        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_MONEY_BAG, "Store item in storage " + std::to_string(index + 1) + ".", 0, HOARDER_ACTION_STORAGE_1 + index, "", 0);
                 }
+
+                sCollector->SetStorageSelection(player->GetGUID(), HOARDER_ACTION_BACKPACK_ITEMS);
                 break;
+            }
             default:
                 // In this case, the action is an item entry
                 // Process the action of storing an item
@@ -93,7 +119,7 @@ public:
                             }
 
                             CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, ItemEntry) VALUES ({}, {})", player->GetGUID().GetCounter(), item->GetEntry());
-                            sCollector->AddItemToCollection(player->GetGUID(), STORAGE_ONE, item->GetEntry());
+                            sCollector->AddItemToCollection(player->GetGUID(), sCollector->GetStorageSelection(player->GetGUID()), item->GetEntry());
                             player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
                             CloseGossipMenuFor(player);
                             return true;
@@ -146,7 +172,6 @@ public:
 
         if (!itemCount)
         {
-            player->SendSystemMessage("You have no items stored in this storage.");
             player->PlayerTalkClass->SendGossipMenu(70001, creature->GetGUID());
             return;
         }
