@@ -101,7 +101,7 @@ void HoardCollector::GiveBankItemToPlayer(Player* player, Creature* vendor, uint
     }
 
     // Perform transaction
-    SQLTransaction trans = CharacterDatabase.BeginTransaction();
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
     player->MoveItemToInventory(dest, pItem, true, false);
     player->SaveInventoryAndGoldToDB(trans);
     CharacterDatabase.CommitTransaction(trans);
