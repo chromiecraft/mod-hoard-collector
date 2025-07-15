@@ -104,6 +104,8 @@ public:
 
     [[nodiscard]] uint32 GetHoarderNpcId() const { return HoarderNpcId; }
     [[nodiscard]] bool IsItemValid(Item* item) const;
+
+    void GiveBankItemToPlayer(Player* player, Creature* vendor, uint32 itemEntry, uint32 vendorslot);
 };
 
 #define sCollector HoardCollector::instance()

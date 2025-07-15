@@ -47,3 +47,72 @@ bool HoardCollector::IsItemValid(Item* item) const
 
     return true;
 }
+
+void HoardCollector::GiveBankItemToPlayer(Player* player, Creature* vendor, uint32 itemEntry, uint32 vendorslot)
+{
+    uint32 playerGuid = player->GetGUID().GetCounter();
+
+    // Get item template
+    ItemTemplate const* proto = sObjectMgr->GetItemTemplate(itemEntry);
+    if (!proto)
+        return;
+
+    QueryResult result = CharacterDatabase.Query("SELECT ItemGUID FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", playerGuid, itemEntry);
+
+    if (!result)
+    {
+        player->SendSystemMessage("You do not have this item in your collection.");
+        return;
+    }
+
+    Field* fields = result->Fetch();
+    uint32 itemGUID = fields[0].Get<uint32>();
+
+    // Create item
+    Item* pItem = NewItemOrBag(proto);
+    if (!pItem)
+        return;
+
+    // Load from DB
+    QueryResult selectItemQuery = CharacterDatabase.Query(
+        "SELECT creatorGuid, giftCreatorGuid, count, duration, charges, flags, enchantments, "
+        "randomPropertyId, durability, playedTime, text, itemEntry "
+        "FROM item_instance WHERE guid = {}",
+        itemGUID
+    );
+
+    Field* selectItemField = nullptr;
+    if (selectItemQuery)
+        selectItemField = selectItemQuery->Fetch();
+
+    if (!selectItemField || !pItem->LoadFromDB(itemGUID, player->GetGUID(), selectItemField, itemEntry))
+    {
+        delete pItem; // avoid leak
+        return;
+    }
+
+    // Try to store in player inventory
+    ItemPosCountVec dest;
+    if (player->CanStoreItem(NULL_BAG, NULL_SLOT, dest, pItem, false) != EQUIP_ERR_OK)
+    {
+        delete pItem;
+        player->SendSystemMessage("Your inventory is full.");
+        return;
+    }
+
+    // Perform transaction
+    SQLTransaction trans = CharacterDatabase.BeginTransaction();
+    player->MoveItemToInventory(dest, pItem, true, false);
+    player->SaveInventoryAndGoldToDB(trans);
+    CharacterDatabase.CommitTransaction(trans);
+
+    // Notify client about vendor item buy
+    WorldPacket data(SMSG_BUY_ITEM, (8 + 4 + 4 + 4));
+    data << vendor->GetGUID();
+    data << uint32(vendorslot + 1);                   // numbered from 1 at client
+    data << 0;
+    data << 1;
+    player->GetSession()->SendPacket(&data);
+
+    CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", playerGuid, itemEntry);
+}

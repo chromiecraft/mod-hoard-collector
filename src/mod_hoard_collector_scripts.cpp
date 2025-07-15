@@ -130,10 +130,21 @@ public:
                                 return true;
                             }
 
-                            CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, ItemEntry) VALUES ({}, {})", player->GetGUID().GetCounter(), item->GetEntry());
-                            sCollector->AddItemToCollection(player->GetGUID(), sCollector->GetStorageSelection(player->GetGUID()), item->GetEntry());
-                            player->DestroyItem(INVENTORY_SLOT_BAG_0, i, true);
+                            uint8 storageID = sCollector->GetStorageSelection(player->GetGUID());
+
+                            CharacterDatabase.Execute("INSERT INTO mod_collector_items (PlayerGUID, StorageID, ItemEntry, ItemGUID) VALUES ({}, {}, {}, {})",
+                                player->GetGUID().GetCounter(), storageID, item->GetEntry(), item->GetGUID().GetCounter());
+                            sCollector->AddItemToCollection(player->GetGUID(), storageID, item->GetEntry());
+
                             CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+                            item->SaveToDB(trans);
+                            CharacterDatabase.CommitTransaction(trans);
+
+                            player->MoveItemFromInventory(INVENTORY_SLOT_BAG_0, i, true);
+
+                            trans = CharacterDatabase.BeginTransaction();
+                            item->DeleteFromInventoryDB(trans);
+                            item->SaveToDB(trans);
                             player->SaveInventoryAndGoldToDB(trans);
                             CharacterDatabase.CommitTransaction(trans);
                             CloseGossipMenuFor(player);
@@ -283,7 +294,7 @@ public:
         sCollector->ClearStorageSelection(player->GetGUID());
     }
 
-    void OnPlayerBeforeBuyItemFromVendor(Player* player, ObjectGuid vendorguid, uint32 /*vendorslot*/, uint32& itemEntry, uint8 /*count*/, uint8 /*bag*/, uint8 /*slot*/) override
+    void OnPlayerBeforeBuyItemFromVendor(Player* player, ObjectGuid vendorguid, uint32 vendorslot, uint32& itemEntry, uint8 /*count*/, uint8 /*bag*/, uint8 /*slot*/) override
     {
         Creature* vendor = player->GetMap()->GetCreature(vendorguid);
         if (!vendor)
@@ -296,26 +307,15 @@ public:
 
         if (storageId == STORAGE_SEARCH && sCollector->HasItemInAnyCollection(player->GetGUID(), itemEntry))
         {
-            player->AddItem(itemEntry, 1); // Add the item to the player's inventory
-
             for (uint8 storage = 0; storage < MAX_HOARDER_STORAGES; ++storage)
                 sCollector->RemoveItemFromCollection(player->GetGUID(), storage, itemEntry); // Remove the item from the collector's collection
 
-            sCollector->RemoveItemFromCollection(player->GetGUID(), storageId, itemEntry);
-            CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", player->GetGUID().GetCounter(), itemEntry);
-
-            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-            player->SaveInventoryAndGoldToDB(trans);
-            CharacterDatabase.CommitTransaction(trans);
+            sCollector->RemoveItemFromCollection(player->GetGUID(), STORAGE_SEARCH, itemEntry);
+            sCollector->GiveBankItemToPlayer(player, vendor, itemEntry, vendorslot); // Give the item to the player
         } else if (sCollector->HasItemInCollection(player->GetGUID(), storageId, itemEntry))
         {
-            player->AddItem(itemEntry, 1); // Add the item to the player's inventory
             sCollector->RemoveItemFromCollection(player->GetGUID(), storageId, itemEntry); // Remove the item from the collector's collection
-            CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", player->GetGUID().GetCounter(), itemEntry);
-
-            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-            player->SaveInventoryAndGoldToDB(trans);
-            CharacterDatabase.CommitTransaction(trans);
+            sCollector->GiveBankItemToPlayer(player, vendor, itemEntry, vendorslot); // Give the item to the player
         }
 
         npc_hoard_the_collector::ShowItemsInFakeVendor(player, vendor, storageId); //Refresh menu
