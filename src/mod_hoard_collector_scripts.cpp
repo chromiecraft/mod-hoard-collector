@@ -55,8 +55,10 @@ public:
 
         for (uint8 index = 0; index < MAX_HOARDER_STORAGES; ++index)
         {
+            uint32 itemCount = sCollector->GetCollectedItems()[player->GetGUID()][index].size();
+            std::string message = Acore::StringFormat("View items stored in storage {}. ({} items)", index + 1, itemCount);
             if (player->GetPlayerSetting(ModName, index).IsEnabled() || player->IsGameMaster())
-                player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_MONEY_BAG, "View items stored in storage " + std::to_string(index + 1) + ".", 0, HOARDER_ACTION_STORAGE_1 + index, "", 0);
+                player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_MONEY_BAG, message, 0, HOARDER_ACTION_STORAGE_1 + index, "", 0);
         }
 
         player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
