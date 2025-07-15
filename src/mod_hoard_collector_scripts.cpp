@@ -47,7 +47,7 @@ public:
 
         player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuIndex, GOSSIP_ICON_CHAT, "Tell me, how does this work?", 0, HOARDER_ACTION_HELP, "", 0);
 
-        if (player->GetPlayerSetting(ModName, STORAGE_ONE).IsEnabled() || player->IsGameMaster())
+        if (sCollector->IsStorageAvailable(player, STORAGE_ONE))
         {
             player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_VENDOR, "Store items from my main backpack.", 0, HOARDER_ACTION_BACKPACK_ITEMS, "", 0);
             player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_INTERACT_1, "Search for items.", GOSSIP_SENDER_MAIN, HOARDER_ACTION_SEARCH_ITEMS, "", 0, true);
@@ -57,7 +57,7 @@ public:
         {
             uint32 itemCount = sCollector->GetCollectedItems()[player->GetGUID()][index].size();
             std::string message = Acore::StringFormat("View items stored in storage {}. ({} items)", index + 1, itemCount);
-            if (player->GetPlayerSetting(ModName, index).IsEnabled() || player->IsGameMaster())
+            if (sCollector->IsStorageAvailable(player, index) || itemCount) // always display if we have items to withdrawal
                 player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_MONEY_BAG, message, 0, HOARDER_ACTION_STORAGE_1 + index, "", 0);
         }
 
@@ -107,7 +107,7 @@ public:
                 uint8 menuIndex = 0;
                 for (uint8 index = 0; index < MAX_HOARDER_STORAGES; ++index)
                 {
-                    if (player->GetPlayerSetting(ModName, index).IsEnabled() || player->IsGameMaster())
+                    if (sCollector->IsStorageAvailable(player, index))
                         player->PlayerTalkClass->GetGossipMenu().AddMenuItem(++menuIndex, GOSSIP_ICON_MONEY_BAG, "Store item in storage " + std::to_string(index + 1) + ".", 0, HOARDER_ACTION_STORAGE_1 + index, "", 0);
                 }
 

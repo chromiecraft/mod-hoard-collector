@@ -116,3 +116,18 @@ void HoardCollector::GiveBankItemToPlayer(Player* player, Creature* vendor, uint
 
     CharacterDatabase.Execute("DELETE FROM mod_collector_items WHERE PlayerGuid = {} AND ItemEntry = {}", playerGuid, itemEntry);
 }
+
+bool HoardCollector::IsStorageAvailable(Player* player, uint8 storageId) const
+{
+    // Always available to game masters
+    if (player->IsGameMaster())
+        return true;
+
+    // Module override, allows enabling the storage without subscription
+    if (player->GetPlayerSetting(ModName, storageId).IsEnabled())
+        return true;
+
+    // Finally, if the storage is available based on the player's subscription.
+    // Each storageId corresponds to a specific subscription level.
+    return player->GetPlayerSetting("acore_cms_subscriptions", 0).value > storageId;
+}

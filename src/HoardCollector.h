@@ -101,9 +101,9 @@ public:
     void SetEnabled(bool enabled) { Enabled = enabled; }
     [[nodiscard]] bool IsEnabled() const { return Enabled; }
     [[nodiscard]] bool IsCollectionEmpty(ObjectGuid playerGuid) { return HoarderCollectedItems[playerGuid].empty(); }
-
-    [[nodiscard]] uint32 GetHoarderNpcId() const { return HoarderNpcId; }
     [[nodiscard]] bool IsItemValid(Item* item) const;
+    [[nodiscard]] bool IsStorageAvailable(Player* player, uint8 storageId) const;
+    [[nodiscard]] uint32 GetHoarderNpcId() const { return HoarderNpcId; }
 
     void GiveBankItemToPlayer(Player* player, Creature* vendor, uint32 itemEntry, uint32 vendorslot);
 };
