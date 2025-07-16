@@ -17,6 +17,11 @@ enum HoarderStorages
     STORAGE_SEARCH // temporary
 };
 
+enum HoarderSettings
+{
+    SETTING_MEMBERSHIP_LEVEL = 0 // Acore CMS Subscriptions
+};
+
 const std::string ModName = "mhc";
 const std::string SubsModName = "acore_cms_subscriptions";
 
@@ -50,11 +55,11 @@ public:
         auto playerIt = HoarderCollectedItems.find(playerGuid);
         if (playerIt != HoarderCollectedItems.end())
         {
-            const auto& storageMap = playerIt->second;
+            auto const& storageMap = playerIt->second;
             auto storageIt = storageMap.find(storageId);
             if (storageIt != storageMap.end())
             {
-                const auto& items = storageIt->second;
+                auto const& items = storageIt->second;
                 return std::find(items.begin(), items.end(), itemId) != items.end();
             }
         }
@@ -66,8 +71,8 @@ public:
         auto playerIt = HoarderCollectedItems.find(playerGuid);
         if (playerIt != HoarderCollectedItems.end())
         {
-            const auto& storageMap = playerIt->second;
-            for (const auto& [storageId, items] : storageMap)
+            auto const& storageMap = playerIt->second;
+            for (auto const& [storageId, items] : storageMap)
             {
                 if (std::find(items.begin(), items.end(), itemId) != items.end())
                     return true;
@@ -104,7 +109,7 @@ public:
     [[nodiscard]] bool IsItemValid(Item* item) const;
     [[nodiscard]] bool IsStorageAvailable(Player* player, uint8 storageId) const;
     [[nodiscard]] uint32 GetHoarderNpcId() const { return HoarderNpcId; }
-    [[nodiscard]] uint32 GetSubscriptionLevel(Player* player) const { return player->GetPlayerSetting("acore_cms_subscriptions", 0).value; };
+    [[nodiscard]] uint32 GetSubscriptionLevel(Player* player) const { return player->GetPlayerSetting(SubsModName, SETTING_MEMBERSHIP_LEVEL).value; };
 
     void GiveBankItemToPlayer(Player* player, Creature* vendor, uint32 itemEntry, uint32 vendorslot);
 };

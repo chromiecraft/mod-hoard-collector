@@ -18,6 +18,7 @@ enum HoarderActions
     HOARDER_ACTION_BACKPACK_ITEMS    = 3,
     HOARDER_ACTION_SEARCH_ITEMS      = 4,
     HOARDER_ACTION_HELP              = 5,
+    HOARDER_ACTION_MAIN_PAGE         = 6
 };
 
 class npc_hoard_the_collector : public CreatureScript
@@ -97,7 +98,10 @@ public:
                     }
 
                     if (!menuItem)
+                    {
+                        player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, "Back.", 0, HOARDER_ACTION_MAIN_PAGE, "", 0);
                         player->PlayerTalkClass->SendGossipMenu(70002, creature->GetGUID());
+                    }
                     else
                         player->PlayerTalkClass->SendGossipMenu(70000, creature->GetGUID());
                 }
@@ -115,7 +119,11 @@ public:
                 break;
             }
             case HOARDER_ACTION_HELP:
+                player->PlayerTalkClass->GetGossipMenu().AddMenuItem(menuItem++, 0, "Back.", 0, HOARDER_ACTION_MAIN_PAGE, "", 0);
                 player->PlayerTalkClass->SendGossipMenu(70004, creature->GetGUID());
+                return true;
+            case HOARDER_ACTION_MAIN_PAGE:
+                OnGossipHello(player, creature);
                 return true;
             default:
                 // In this case, the action is an item entry
@@ -185,14 +193,14 @@ public:
         std::vector<uint32> allItems;
 
         if (auto it = sCollector->GetCollectedItems().find(player->GetGUID()); it != sCollector->GetCollectedItems().end())
-            for (const auto& [_, items] : it->second)
+            for (auto const& [_, items] : it->second)
                 for (uint32 itemId : items)
                     allItems.emplace_back(itemId);
 
         uint32 matchedCount = 0;
         std::vector<uint32> foundItems;
 
-        for (const auto& item : allItems)
+        for (auto const& item : allItems)
         {
             if (matchedCount >= MAX_VENDOR_ITEMS)
                 break;
@@ -209,7 +217,10 @@ public:
         }
 
         if (!matchedCount)
+        {
+            player->PlayerTalkClass->GetGossipMenu().AddMenuItem(0, 0, "Back.", 0, HOARDER_ACTION_MAIN_PAGE, "", 0);
             player->PlayerTalkClass->SendGossipMenu(70003, creature->GetGUID());
+        }
         else
         {
             sCollector->SetStorageSelection(player->GetGUID(), STORAGE_SEARCH);
@@ -259,6 +270,7 @@ public:
 
         if (!itemCount)
         {
+            player->PlayerTalkClass->GetGossipMenu().AddMenuItem(0, 0, "Back.", 0, HOARDER_ACTION_MAIN_PAGE, "", 0);
             player->PlayerTalkClass->SendGossipMenu(70001, creature->GetGUID());
             return;
         }
