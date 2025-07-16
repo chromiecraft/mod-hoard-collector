@@ -242,8 +242,8 @@ public:
         std::ostringstream ss;
         ss << "|TInterface";
 
-        const ItemTemplate* itemTemplate = sObjectMgr->GetItemTemplate(entry);
-        const ItemDisplayInfoEntry* displayInfo = nullptr;
+        ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(entry);
+        ItemDisplayInfoEntry const* displayInfo = nullptr;
 
         if (itemTemplate)
             displayInfo = sItemDisplayInfoStore.LookupEntry(itemTemplate->DisplayInfoID);
