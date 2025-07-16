@@ -129,5 +129,5 @@ bool HoardCollector::IsStorageAvailable(Player* player, uint8 storageId) const
 
     // Finally, if the storage is available based on the player's subscription.
     // Each storageId corresponds to a specific subscription level.
-    return player->GetPlayerSetting("acore_cms_subscriptions", 0).value > storageId;
+    return GetSubscriptionLevel(player) > storageId;
 }

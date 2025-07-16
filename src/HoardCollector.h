@@ -104,6 +104,7 @@ public:
     [[nodiscard]] bool IsItemValid(Item* item) const;
     [[nodiscard]] bool IsStorageAvailable(Player* player, uint8 storageId) const;
     [[nodiscard]] uint32 GetHoarderNpcId() const { return HoarderNpcId; }
+    [[nodiscard]] uint32 GetSubscriptionLevel(Player* player) const { return player->GetPlayerSetting("acore_cms_subscriptions", 0).value; };
 
     void GiveBankItemToPlayer(Player* player, Creature* vendor, uint32 itemEntry, uint32 vendorslot);
 };
