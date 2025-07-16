@@ -230,22 +230,30 @@ public:
         return true;
     }
 
-    // @brief Returns the icon for an item with specified entry, width, height, x and y offsets.
+    /// @brief Returns a formatted WoW icon string for an item.
+    /// @param entry   Item entry ID
+    /// @param width   Icon width
+    /// @param height  Icon height
+    /// @param x       X offset
+    /// @param y       Y offset
+    /// @return A texture string like "|TInterface/ICONS/...:width:height:x:y|t"
     std::string GetItemIcon(uint32 entry, uint32 width, uint32 height, int x, int y) const
     {
         std::ostringstream ss;
         ss << "|TInterface";
-        const ItemTemplate* temp = sObjectMgr->GetItemTemplate(entry);
-        const ItemDisplayInfoEntry* dispInfo = NULL;
-        if (temp)
-        {
-            dispInfo = sItemDisplayInfoStore.LookupEntry(temp->DisplayInfoID);
-            if (dispInfo)
-                ss << "/ICONS/" << dispInfo->inventoryIcon;
-        }
-        if (!dispInfo)
+
+        const ItemTemplate* itemTemplate = sObjectMgr->GetItemTemplate(entry);
+        const ItemDisplayInfoEntry* displayInfo = nullptr;
+
+        if (itemTemplate)
+            displayInfo = sItemDisplayInfoStore.LookupEntry(itemTemplate->DisplayInfoID);
+
+        if (displayInfo && displayInfo->inventoryIcon && *displayInfo->inventoryIcon)
+            ss << "/ICONS/" << displayInfo->inventoryIcon;
+        else
             ss << "/InventoryItems/WoWUnknownItem01";
-        ss << ":" << width << ":" << height << ":" << x << ":" << y << "|t";
+
+        ss << ':' << width << ':' << height << ':' << x << ':' << y << "|t";
         return ss.str();
     }
 
