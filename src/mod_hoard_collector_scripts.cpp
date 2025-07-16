@@ -264,31 +264,32 @@ public:
 
     static void ShowItemsInFakeVendor(Player* player, Creature* creature, uint8 storage)
     {
-        std::vector<uint32> itemList = sCollector->GetCollectedItems()[player->GetGUID()][storage];
+        auto const& itemList = sCollector->GetCollectedItems()[player->GetGUID()][storage];
 
-        uint32 itemCount = itemList.size();
-
-        if (!itemCount)
+        if (itemList.empty())
         {
             player->PlayerTalkClass->GetGossipMenu().AddMenuItem(0, 0, "Back.", 0, HOARDER_ACTION_MAIN_PAGE, "", 0);
             player->PlayerTalkClass->SendGossipMenu(70001, creature->GetGUID());
             return;
         }
 
-        WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + itemCount * 8 * 4);
+        WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + itemList.size() * 8 * 4);
         data << uint64(creature->GetGUID().GetRawValue());
 
         uint8 count = 0;
-        size_t count_pos = data.wpos();
+        size_t countPos = data.wpos();
         data << uint8(count);
 
-        for (uint32 i = 0; i < itemCount && count < MAX_VENDOR_ITEMS; ++i)
+        for (uint32 entry : itemList)
         {
-            if (ItemTemplate const* itemtemplate = sObjectMgr->GetItemTemplate(itemList[i]))
-                EncodeItemToPacket(data, itemtemplate, count, 0); // Assuming no price for simplicity
+            if (count >= MAX_VENDOR_ITEMS)
+                break;
+
+            if (ItemTemplate const* itemTemplate = sObjectMgr->GetItemTemplate(entry))
+                EncodeItemToPacket(data, itemTemplate, count, 0);
         }
 
-        data.put(count_pos, count);
+        data.put<uint8>(countPos, count);
         player->GetSession()->SendPacket(&data);
     }
 };
