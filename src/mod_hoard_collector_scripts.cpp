@@ -168,7 +168,7 @@ public:
         return true;
     }
 
-    bool OnGossipSelectCode(Player* player, Creature* creature, uint32 sender, uint32 action, const char* code) override
+    bool OnGossipSelectCode(Player* player, Creature* creature, uint32 sender, uint32 /*action*/, const char* code) override
     {
         player->PlayerTalkClass->ClearMenus();
 
@@ -354,7 +354,7 @@ public:
         }) {
     }
 
-    void OnAfterConfigLoad(bool reload) override
+    void OnAfterConfigLoad(bool /*reload*/) override
     {
         sCollector->SetEnabled(sConfigMgr->GetOption<bool>("ModHoardCollector.Enable", false));
         sCollector->SetHoarderNpcId(sConfigMgr->GetOption<uint32>("ModHoardCollector.NpcID", 70000));
